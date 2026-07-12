@@ -9,4 +9,6 @@ BLENDER_PARAMS = {
     # --- test-APP.sh.tmpl (Task 4) --- (MCP_SERVER_ARGV reused from above)
     "SMOKE_CALL": "get_scene_info",
     "APP_CONFIG_DIR": "/Users/bra0002h/Library/Application Support/Blender",
+    # --- doc templates (Task 5) ---
+    "INSTANCE_REPO": "~/mcp-servers/blender-mcp",
 }
