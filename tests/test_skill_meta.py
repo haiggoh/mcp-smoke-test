@@ -23,3 +23,24 @@ def test_skill_md_frontmatter():
     fm = m.group(1)
     assert re.search(r"^name:\s*mcp-smoke-test\s*$", fm, re.M), "name must equal dir name"
     assert re.search(r"^description:\s*\S", fm, re.M), "description required"
+
+def test_skill_md_has_required_sections():
+    from conftest import SKILL_DIR
+    body = open(os.path.join(SKILL_DIR, "SKILL.md")).read()
+    for heading in (
+        "## When to use",
+        "## The prereq ladder",
+        "## Functional verification",
+        "## Probe-reliability rules",
+        "## Publish framing",
+        "## Instantiation procedure",
+    ):
+        assert heading in body, f"SKILL.md missing section: {heading}"
+
+def test_skill_md_names_the_five_templates():
+    from conftest import SKILL_DIR
+    body = open(os.path.join(SKILL_DIR, "SKILL.md")).read()
+    for t in ("test-APP.sh.tmpl", "probe-capabilities.py.tmpl",
+              "APP-MCP-CAPABILITIES.md.tmpl", "PROJECT-NOTES.md.tmpl",
+              "interactive-guide.md.tmpl"):
+        assert t in body, f"SKILL.md must reference template {t}"
