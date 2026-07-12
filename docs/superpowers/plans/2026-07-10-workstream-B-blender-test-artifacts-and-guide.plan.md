@@ -8,6 +8,10 @@
 
 **Tech Stack:** Python 3 (stdlib only: `subprocess`, `threading`, `json`, `time`, `os`, `re`, `argparse`), Bash (`set -euo pipefail`), `uvx blender-mcp` as the MCP server, the in-Blender add-on socket on `127.0.0.1:9876`, `pytest` for the pure-helper unit tests, `git`/`gh` for version control.
 
+> **Execution refinements (added 2026-07-12 during recovery — apply when executing):**
+> 1. **No Blender reload of its own — shares Workstream A's session.** This plan adds only external test scripts and does NOT modify `addon.py`, so it needs no add-on reload: its probe runs against the same live Blender + add-on session used in Workstream A (one shared reload/connection, not two).
+> 2. **Be honest about the `set_texture` reload boundary in the probe.** Because the live add-on may not have been reloaded with Workstream A's fix during this session, the probe's `set_texture` check must detect whether the running add-on actually contains the fix (probe the node path via `execute_blender_code`) and classify it as WORKS (fix live) or `FIXED-PENDING-RELOAD` (fix present in `addon.py` + node-logic verified via `execute_blender_code`, awaiting an add-on reload) — never a misleading BROKEN. Seed the capabilities manual with that same distinction.
+
 ## Global Constraints
 
 These rules are project-wide and apply to EVERY task below. Do not violate them even where a task step is silent about them.

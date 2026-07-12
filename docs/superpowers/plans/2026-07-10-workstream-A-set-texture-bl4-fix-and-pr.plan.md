@@ -8,6 +8,10 @@
 
 **Tech Stack:** Python (Blender `bpy` API), `git`, `gh` CLI (authed as `haiggoh`), Blender 5.1.2 with the "Interface: Blender MCP" add-on, `uvx blender-mcp` MCP server over stdio, the Blender MCP tools (`execute_blender_code`, `download_polyhaven_asset`, `set_texture`, `get_viewport_screenshot`, `get_scene_info`, `get_object_info`).
 
+> **Execution refinements (added 2026-07-12 during recovery — apply when executing):**
+> 1. **Decouple the upstream PR from the critical path.** Open the `ahujasid/blender-mcp` PR immediately after the fix is verified live, then proceed to Workstreams B and C without waiting on maintainer review — the PR is off the critical path. If Workstream B's probe later surfaces *unrelated* add-on bugs, file them as SEPARATE follow-up PRs; do not expand or delay this focused, backward-compatible `set_texture` PR.
+> 2. **Verify by direct node-logic execution, not by hot-reloading the live add-on.** The running add-on cannot be safely hot-reloaded over its own MCP socket (disabling/re-enabling it drops the port-9876 channel we drive it through). So prove correctness on Blender 5.1 by running the fixed, version-guarded ARM-split logic directly via `execute_blender_code` against a real downloaded PBR material (assert AO/Roughness/Metallic wire through `ShaderNodeSeparateColor` and the material renders), and patch all three `addon.py` copies. The end-to-end `set_texture` *MCP-tool* call needs a natural Blender restart / add-on re-enable and is an OPTIONAL follow-up — it does not gate completion, because the fix is proven by direct execution. (Live-confirmed 2026-07-12: `bpy.app.version==(5,1,2)`, `ShaderNodeSeparateRGB` absent, `ShaderNodeSeparateColor` present.)
+
 ## Global Constraints
 
 These rules apply project-wide to every task in this plan. Follow them verbatim.
