@@ -1,0 +1,9 @@
+{
+  "name": "mcp-smoke-test",
+  "version": "0.1.0",
+  "description": "Onboard and verify any MCP that drives an external app: a repeatable smoke test, a functional capability probe (WORKS/PARTIAL/BROKEN by assertions that can fail, not by 'no exception'), an evidence-based capabilities manual, and an interactive prereq-ladder setup guide — with parametrized templates you instantiate per MCP.",
+  "author": { "name": "Heiko Brantsch" },
+  "homepage": "https://github.com/haiggoh/mcp-smoke-test",
+  "license": "MIT",
+  "keywords": ["skill", "mcp", "testing", "probe", "onboarding", "capabilities", "blender", "photoshop"]
+}
