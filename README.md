@@ -19,10 +19,10 @@ starting point you instantiate per MCP. The first fully-worked instance is the B
 ## Install
 
 This plugin is published through the canonical `haiggoh` marketplace (the
-`claude-code-desktop-sync` repo). In Claude Code:
+`get-haiggoh` repo). In Claude Code:
 
 ```
-/plugin marketplace add haiggoh/claude-code-desktop-sync
+/plugin marketplace add haiggoh/get-haiggoh
 /plugin install mcp-smoke-test@haiggoh
 ```
 
