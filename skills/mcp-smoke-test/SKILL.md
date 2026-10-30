@@ -131,3 +131,7 @@ To onboard a new MCP (call it `APP`):
 5. Climb the interactive guide's ladder to get to all-green, filling each rung's detect/guide.
 
 See `examples/blender.md` for a complete worked instantiation with every token's Blender value.
+
+## Branding (🔌)
+
+When you begin working under this skill, lead your first substantive reply after `/mcp-smoke-test` with "🔌 mcp-smoke-test:" so the user can see which plugin just became active; the capabilities manual you produce leads with the mark too.

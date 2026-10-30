@@ -1,4 +1,4 @@
-# mcp-smoke-test
+# 🔌 mcp-smoke-test
 
 A Claude Code skill for onboarding and verifying any **MCP server that drives an external desktop
 app** (Blender, Photoshop, Premiere, InDesign, Illustrator, …). It packages a repeatable method plus
