@@ -1,7 +1,7 @@
 {
   "name": "mcp-smoke-test",
-  "version": "0.2.1",
-  "description": "🔌 Onboard and verify any MCP that drives an external app: a repeatable smoke test, a functional capability probe (WORKS/PARTIAL/BROKEN by assertions that can fail, not by 'no exception'), an evidence-based capabilities manual, and an interactive prereq-ladder setup guide — with parametrized templates you instantiate per MCP.",
+  "version": "0.2.2",
+  "description": "🔌 Onboard and verify any MCP server that drives an external app: a repeatable read-only smoke test with actionable failure hints, a capability probe that gives each tool a WORKS / PARTIAL / BROKEN / INCONCLUSIVE verdict from assertions that can fail, an evidence-based capabilities manual, and an interactive prerequisite-ladder setup guide, all from parametrized templates.",
   "author": { "name": "Heiko Brantsch" },
   "homepage": "https://github.com/haiggoh/mcp-smoke-test",
   "license": "MIT",
