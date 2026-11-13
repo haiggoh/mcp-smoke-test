@@ -68,7 +68,8 @@ error."** Return status lies for exactly the broken commands you care about. For
   PNG/image bytes present after a screenshot; a node of the expected type present after a material
   op; a reported flag matching the live toggle.
 - **WORKS** = call ok AND the state changed as expected. **PARTIAL** = call ok but the change did
-  not happen. **BROKEN** = the call did not report success.
+  not happen. **BROKEN** = the call did not report success — that includes MCP application errors
+  (`result.isError=true`), not just transport errors; the flag, not the text prefix, is the check.
 - Reserve **INCONCLUSIVE** for when the *verification read itself* was unavailable (you can't trust
   the verdict either way) — e.g. the state-reading call failed, or a network dependency was offline.
 - Prefer an independent measurement path for the "after" read (e.g. run code in the app to count
@@ -87,11 +88,25 @@ These are hard-won; ignore them and the probe lies or hangs:
   and stays inspectable. (`DEVNULL` or a reader thread also work; a file is the most debuggable.)
 - **One `tools/call` at a time.** Never fire overlapping requests; the relayed app socket is
   typically per-call. Pace calls slightly if the transport connects/disconnects per call.
-- **Retry a no-response once, then fail-fast.** A single missed response is usually a transient
-  transport hiccup (the hung call never executed). A *second consecutive* timeout is a real stall —
-  write a partial report marked `aborted`, `stdout.flush()` (because `os._exit` skips buffer flush),
-  and hard-exit. Never let one stall stamp every downstream command BROKEN (that manufactures false
-  cascades).
+- **Retry a no-response once, then fail-fast — but NEVER blind-retry a mutating call.** A single
+  missed response is usually a transient transport hiccup *for a read-only call* (the hung call
+  never executed). For a call that WRITES state, a lost response does not mean the execution never
+  happened: a blind retry applies the mutation a second time, and the app's auto-rename
+  (`ASSERT_CUBE.001`) leaks the duplicate past name-based cleanup. Mutating calls are therefore
+  never retried — the before/after state delta decides instead (effect landed = WORKS even with
+  the response lost; nothing changed = BROKEN). A *second consecutive* read-only timeout is a
+  real stall — write a partial report marked `aborted`,
+  `stdout.flush()` (because `os._exit` skips buffer flush), and hard-exit. Never let one stall
+  stamp every downstream command BROKEN (that manufactures false cascades).
+- **Gate every call on the server's `tools/list`.** A tool the server does not declare cannot work;
+  calling it only yields a pydantic/validation error, which is NOT a capability verdict — skip with
+  a NOT-DECLARED marker instead.
+- **Check `result.isError`, everywhere.** The JSON-RPC `error` key covers transport failures only;
+  an MCP application error arrives as `result.isError=true` with content text that may not start
+  with "error". A smoke or probe verdict that ignores the flag reads failures as PASS/PARTIAL.
+- **Cleanup is ownership-aware.** Snapshot existence *before* each creating call and track an
+  artifact for cleanup only when it was absent before and present after (`owned_new`). A name that
+  already existed is the user's — deleting it destroys their state under the banner of cleanup.
 - **Terminate the spawned server in `finally`,** and clean up every artifact the probe created in
   the app (objects, materials, documents, temp files) — restore the pre-probe state.
 - **Plugins/add-ons don't hot-reload.** After a bridge-plugin code change, the user must reload it
@@ -117,10 +132,12 @@ Publish the skill itself through the ONE canonical `haiggoh` marketplace (never 
 
 To onboard a new MCP (call it `APP`):
 
-1. Copy the five templates from `templates/` into the new instance repo, renaming `APP`/`test-APP`
+1. Copy the six templates from `templates/` into the new instance repo, renaming `APP`/`test-APP`
    to the app:
    - `test-APP.sh.tmpl` — the launcher (smoke vs `--capabilities`).
    - `probe-capabilities.py.tmpl` — the stdio-JSON-RPC probe engine + a worked `run_probe` example.
+   - `probe_helpers.py.tmpl` — the engine's pure helpers (result unwrapping with isError,
+     verdict classification, ownership-aware cleanup, report summary). No tokens; copy as-is.
    - `APP-MCP-CAPABILITIES.md.tmpl` — the evidence-based manual skeleton.
    - `PROJECT-NOTES.md.tmpl` — the running record / diff-surface / two-tier-testing skeleton.
    - `interactive-guide.md.tmpl` — the prereq-ladder walkthrough.

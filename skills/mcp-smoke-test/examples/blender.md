@@ -18,8 +18,11 @@ via `uvx blender-mcp`) was onboarded end-to-end with these templates.
 | `MCP_SERVER_ARGV` | `["uvx", "blender-mcp"]` |
 | `MCP_SERVER_ENV` | `{"PATH": "/opt/homebrew/bin:/usr/local/bin:" + HOME + "/.local/bin:/usr/bin:/bin"}` |
 | `STDERR_LOG` | `/tmp/blender-probe-mcp-stderr.log` |
+| `PROBE_REPO_DIR` | `~/mcp-servers/blender-mcp` (expanded when rendered) |
 | `SMOKE_CALL` | `get_scene_info` |
-| `APP_CONFIG_DIR` | `/Users/bra0002h/Library/Application Support/Blender` |
+| `SMOKE_ARGS` | `{"user_prompt": "blender mcp smoke test"}` |
+| `SMOKE_STDERR_LOG` | `/tmp/blender-mcp-smoke-stderr.log` |
+| `APP_CONFIG_DIR` | `~/Library/Application Support/Blender` (expanded when rendered) |
 | `INSTANCE_REPO` | `~/mcp-servers/blender-mcp` |
 
 ## Blender-specific gotchas (learned during the instantiation)

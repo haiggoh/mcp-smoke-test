@@ -38,6 +38,7 @@ skills/mcp-smoke-test/
   templates/                        # instantiate these per MCP
     test-APP.sh.tmpl
     probe-capabilities.py.tmpl
+    probe_helpers.py.tmpl
     APP-MCP-CAPABILITIES.md.tmpl
     PROJECT-NOTES.md.tmpl
     interactive-guide.md.tmpl
@@ -54,7 +55,10 @@ pytest tests/ -q
 
 The tests enforce that each template round-trips (instantiating it with the Blender parameter set
 reproduces the proven Blender artifact byte-for-byte) and that the placeholder manifest documents
-exactly the tokens the templates use.
+exactly the tokens the templates use. The round-trip checks use the local proven Blender instance
+(`~/mcp-servers/blender-mcp`; override its location with `MCP_SMOKE_INSTANCE_DIR`) and skip with a
+reason when it is absent, so a fresh clone still runs the whole behavioral suite — the probe engine
+and launcher are additionally exercised offline against stub stdio MCP servers.
 
 ## License
 

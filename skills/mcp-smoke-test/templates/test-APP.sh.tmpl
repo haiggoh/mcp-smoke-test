@@ -7,7 +7,7 @@
 # in-Blender add-on socket on 127.0.0.1:9876. Blender must be running with the add-on connected.
 set -euo pipefail
 
-REPO="/Users/bra0002h/mcp-servers/blender-mcp"
+REPO="{{PROBE_REPO_DIR}}"
 BLENDER_CFG="{{APP_CONFIG_DIR}}"
 # Resolve node/python/uvx from Homebrew + user-local bins regardless of caller PATH.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:/usr/bin:/bin"
@@ -48,19 +48,21 @@ esac
 echo ""
 echo "Smoke test: spawning 'uvx blender-mcp' and calling get_scene_info (read-only)..."
 
-STDERR_LOG="/tmp/blender-mcp-smoke-stderr.log"
+STDERR_LOG="{{SMOKE_STDERR_LOG}}"
 : > "$STDERR_LOG"
 
-# Spawn the server; capture its PID so the EXIT trap can kill ONLY what we started.
-python3 - "$STDERR_LOG" <<'PYEOF'
+# Spawn the server; its termination is owned by the heredoc's finally (only what we started).
+SMOKE_RC=0
+python3 - "$STDERR_LOG" <<'PYEOF' || SMOKE_RC=$?
 import json, os, subprocess, sys, threading, time
 
+HOME = os.path.expanduser("~")
 stderr_log = sys.argv[1]
 sink = open(stderr_log, "w")
 proc = subprocess.Popen(
     {{MCP_SERVER_ARGV}},
     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sink,
-    text=True, bufsize=1, env={"PATH": os.environ["PATH"]},
+    text=True, bufsize=1, env={{MCP_SERVER_ENV}},
 )
 
 resp = {}
@@ -107,7 +109,7 @@ try:
     time.sleep(0.5)
     send({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
           "params": {"name": "{{SMOKE_CALL}}",
-                     "arguments": {"user_prompt": "blender mcp smoke test"}}})
+                     "arguments": {{SMOKE_ARGS}}}})
     m = wait_for(2, 20)
     if m is None:
         print("SMOKE FAIL: no response to get_scene_info within 20s.")
@@ -121,6 +123,14 @@ try:
     res = m.get("result", {}) or {}
     content = res.get("content") or []
     text = content[0].get("text") if content and isinstance(content[0], dict) else ""
+    # MCP application errors arrive as result.isError=true — the JSON-RPC "error" key above
+    # only covers transport errors, and the error text may not start with "error". Without
+    # this check a tool-level failure reads as SMOKE PASS.
+    if res.get("isError"):
+        print("SMOKE FAIL: get_scene_info returned an application error (result.isError=true):")
+        print("  " + (text or "")[:400])
+        print("  (the tool executed but failed app-side — not a connectivity pass).")
+        raise SystemExit(1)
     if (text or "").lower().startswith("error"):
         print("SMOKE FAIL: get_scene_info returned an application error:")
         print("  " + (text or "")[:400])
@@ -136,7 +146,6 @@ finally:
         pass
 sys.exit(rc)
 PYEOF
-SMOKE_RC=$?
 
 echo ""
 echo "(server stderr log: $STDERR_LOG)"

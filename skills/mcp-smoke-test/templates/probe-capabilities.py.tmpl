@@ -12,6 +12,14 @@ Reliability rules (hard-won):
   - stderr is drained to a FILE, never an unread PIPE (see comment at _stderr_sink).
   - one call at a time; each call paces to avoid racing the per-call socket.
   - retry-once then fail-fast on a 2nd consecutive timeout (real stall != capability result).
+    MUTATING calls are the exception: a lost response is NEVER retried (the first execution
+    may have landed; a retry would apply it twice). The state delta decides instead.
+  - every call is gated on the server's tools/list (NOT-DECLARED: a tool the server does not
+    declare cannot work, and a validation error is not a capability verdict).
+  - results are judged with isError in mind: probe_helpers.unwrap_tool_result treats
+    result.isError=true as failure, never as "the call returned without an error".
+  - cleanup is ownership-aware (probe_helpers.owned_new): an artifact name that already
+    existed before the probe is the user's and is never deleted.
   - try/finally terminates the subprocess; scene artifacts the probe creates are cleaned up.
   - every tools/call carries a user_prompt argument (the blender-mcp server requires it).
 """
@@ -24,7 +32,7 @@ import time
 import probe_helpers as h
 
 HOME = os.path.expanduser("~")
-REPO = f"{HOME}/mcp-servers/blender-mcp"
+REPO = "{{PROBE_REPO_DIR}}"
 REPORT = f"{REPO}/capability-report.json"
 STDERR_LOG = "{{STDERR_LOG}}"
 PACE = 0.15  # small gap between calls; the add-on socket is per-call/relayed
@@ -98,20 +106,60 @@ def _abort_stall(tool):
     os._exit(2)
 
 
-# --- one JSON-RPC tools/call, retry-once, fail-fast on 2nd stall --------------
+# --- tools/list gate: never call a tool the server does not declare -----------
+_declared = {"fetched": False, "names": set()}
+
+
+def _tool_declared(tool):
+    """True when the server's tools/list declares `tool`. tools/list is fetched once; if
+    that itself fails, nothing is gated (the per-tool calls decide). Rationale: a tool the
+    server does not declare cannot work, and calling it only yields a pydantic/validation
+    error — which is NOT a capability verdict."""
+    if not _declared["fetched"]:
+        _declared["fetched"] = True
+        _id[0] += 1
+        i = _id[0]
+        _send({"jsonrpc": "2.0", "id": i, "method": "tools/list", "params": {}})
+        m = None
+        t0 = time.time()
+        while time.time() - t0 < 15:
+            with _lock:
+                if i in _resp:
+                    m = _resp.pop(i)
+                    break
+            time.sleep(0.08)
+        if m is not None:
+            res = m.get("result", {}) or {}
+            _declared["names"] = {t.get("name") for t in (res.get("tools") or [])
+                                  if isinstance(t, dict)}
+    if not _declared["names"]:
+        return True  # tools/list unavailable or empty — don't gate on it
+    return tool in _declared["names"]
+
+
+# --- one JSON-RPC tools/call, retry-once (read-only), fail-fast on 2nd stall ---
 _id = [100]
 
 
-def call(tool, args=None, timeout=30):
+def call(tool, args=None, timeout=30, mutating=False):
     """Issue exactly one tools/call and return (ok, payload, raw). One call at a time.
 
     Every call carries a `user_prompt` argument — the blender-mcp server declares it
     required (e.g. get_scene_info) and accepts it on every other tool, so injecting it
-    universally is safe and avoids a pydantic 'Field required' validation error."""
+    universally is safe and avoids a pydantic 'Field required' validation error.
+
+    mutating=True: a lost response is NOT retried — the first execution may have landed,
+    and a blind retry would apply the mutation twice (a duplicate the app auto-renames,
+    which then leaks past name-based cleanup). The before/after state delta at the call
+    site decides the verdict instead. Read-only calls keep the retry-once hiccup rule."""
+    if not _tool_declared(tool):
+        print(f"  [NOT-DECLARED] {tool}: server tools/list does not declare it — call "
+              "skipped (a validation error is not a capability verdict)")
+        return (False, None, f"NOT-DECLARED: '{tool}' not in server tools/list")
     time.sleep(PACE)
     args = dict(args or {})
     args.setdefault("user_prompt", f"capability probe: {tool}")
-    for attempt in (1, 2):
+    for attempt in (1,) if mutating else (1, 2):
         _id[0] += 1
         i = _id[0]
         _send({"jsonrpc": "2.0", "id": i, "method": "tools/call",
@@ -126,20 +174,27 @@ def call(tool, args=None, timeout=30):
             time.sleep(0.08)
         if m is not None:
             break
-        if attempt == 1:
+        if attempt == 1 and not mutating:
             time.sleep(0.6)  # transport hiccup — one retry (the hung call never executed)
             continue
+        if mutating:
+            # response lost, not retried (the mutation may have landed); the call site's
+            # state delta decides the verdict
+            return (False, None, "NO-RESPONSE (mutating; not retried)")
         _abort_stall(tool)  # 2nd consecutive timeout == real stall
         return (False, None, "TIMEOUT")  # unreachable
     return h.unwrap_tool_result(m)
 
 
-def bl(code, timeout=30):
+def bl(code, timeout=30, mutating=False):
     """Run Python in Blender via execute_blender_code; return captured stdout text or None.
 
     The add-on captures print() output and returns it; the MCP server prefixes that with
-    'Code executed successfully:' — we strip the banner so callers get just the printed text."""
-    ok, payload, raw = call("execute_blender_code", {"code": code}, timeout=timeout)
+    'Code executed successfully:' — we strip the banner so callers get just the printed text.
+    mutating=True for code that WRITES scene state (e.g. adding an object): the lost-response
+    retry is skipped. Reads and the idempotent cleanup keep the retry-once rule."""
+    ok, payload, raw = call("execute_blender_code", {"code": code}, timeout=timeout,
+                            mutating=mutating)
     if not ok:
         return None
     text = raw
@@ -177,6 +232,11 @@ def _handshake():
 def call_full(tool, args=None, timeout=30):
     """Like call() but returns the full JSON-RPC message dict (needed to inspect image
     content for get_viewport_screenshot). Same user_prompt injection + retry/fail-fast."""
+    if not _tool_declared(tool):
+        print(f"  [NOT-DECLARED] {tool}: server tools/list does not declare it — call "
+              "skipped (a validation error is not a capability verdict)")
+        return {"error": {"code": -32601,
+                          "message": f"NOT-DECLARED: '{tool}' not in server tools/list"}}
     time.sleep(PACE)
     args = dict(args or {})
     args.setdefault("user_prompt", f"capability probe: {tool}")
@@ -285,18 +345,20 @@ def run_probe():
 
     # 2) execute_blender_code — add a cube, object count must go up by exactly 1.
     c0 = obj_count()
+    cube_before = obj_exists("ASSERT_CUBE")
     ok, _, raw = call("execute_blender_code",
                       {"code": "import bpy; bpy.ops.mesh.primitive_cube_add(); "
                                "bpy.context.active_object.name='ASSERT_CUBE'; print('ADDED')"},
-                      timeout=30)
-    if obj_exists("ASSERT_CUBE"):
+                      timeout=30, mutating=True)
+    if h.owned_new(cube_before, obj_exists("ASSERT_CUBE")):
         created_objs.append("ASSERT_CUBE")
     c1 = obj_count()
     verify_ok = c0 != -1 and c1 != -1
     changed = verify_ok and c1 == c0 + 1
     rec("execute_blender_code",
-        h.classify(ok, changed, verify_ok),
-        f"object count {c0}->{c1} (expected +1); named ASSERT_CUBE")
+        h.classify(ok or changed, changed, verify_ok),
+        f"object count {c0}->{c1} (expected +1); named ASSERT_CUBE"
+        + ("" if ok else "; response lost (mutating — not retried; state delta decides)"))
 
     # 3) get_object_info — known cube must report MESH; a bad name must error.
     ok, payload, raw = call("get_object_info", {"object_name": "ASSERT_CUBE"}, timeout=20)
@@ -356,10 +418,12 @@ def run_probe():
         rec("set_texture", "SKIPPED", "depends on download_polyhaven_asset (PolyHaven OFF)")
     else:
         asset = "dark_wood"
+        mat_before = mat_exists(asset)
         ok, payload, raw = call("download_polyhaven_asset",
                                 {"asset_id": asset, "asset_type": "textures", "resolution": "1k"},
-                                timeout=90)
+                                timeout=90, mutating=True)
         made_mat = mat_exists(asset)
+        created = h.owned_new(mat_before, made_mat)
         node_out = bl(
             "import bpy\n"
             f"m = bpy.data.materials.get({asset!r})\n"
@@ -372,7 +436,7 @@ def run_probe():
             tex_nodes = int((node_out or "0").strip().splitlines()[-1])
         except Exception:
             tex_nodes = -1
-        if made_mat:
+        if created:
             created_mats.append(asset)
         offline = (not ok) and any(s in (raw or "").lower()
                                    for s in ("network", "resolve", "timed out", "connection"))
@@ -382,22 +446,28 @@ def run_probe():
             rec("set_texture", "INCONCLUSIVE", "cannot test: material download inconclusive (offline)")
         else:
             verify_ok = tex_nodes != -1
-            changed = made_mat and tex_nodes > 0
+            changed = created and tex_nodes > 0
             rec("download_polyhaven_asset",
-                h.classify(ok, changed, verify_ok),
-                f"material '{asset}' created={made_mat}, TEX_IMAGE nodes={tex_nodes}")
+                h.classify(ok or changed, changed, verify_ok),
+                f"material '{asset}' created={created} (existed_before={mat_before}), "
+                f"TEX_IMAGE nodes={tex_nodes}")
 
             # 7) set_texture — honest about the reload boundary (Workstream A fix).
+            plane_before = obj_exists("ASSERT_PLANE")
             bl("import bpy; bpy.ops.mesh.primitive_plane_add(); "
-               "bpy.context.active_object.name='ASSERT_PLANE'; print('PLANE')")
-            if obj_exists("ASSERT_PLANE"):
+               "bpy.context.active_object.name='ASSERT_PLANE'; print('PLANE')", mutating=True)
+            if h.owned_new(plane_before, obj_exists("ASSERT_PLANE")):
                 created_objs.append("ASSERT_PLANE")
+            st_mat = f"{asset}_material_ASSERT_PLANE"
+            st_mat_before = mat_exists(st_mat)
             ok_st, payload_st, raw_st = call("set_texture",
                                              {"object_name": "ASSERT_PLANE", "texture_id": asset},
-                                             timeout=45)
+                                             timeout=45, mutating=True)
             # set_texture creates its own material (<texture_id>_material_<object_name>) even on
-            # the old error path — track it so cleanup removes it too.
-            created_mats.append(f"{asset}_material_ASSERT_PLANE")
+            # the old error path — track it for cleanup ONLY if the probe created it (a
+            # pre-existing name is the user's; never delete it).
+            if h.owned_new(st_mat_before, mat_exists(st_mat)):
+                created_mats.append(st_mat)
             sep_out = bl(
                 "import bpy\n"
                 "o = bpy.data.objects.get('ASSERT_PLANE')\n"
@@ -428,8 +498,10 @@ def run_probe():
                     "ShaderNodeSeparateRGB undefined on Blender 4.0+ and the fix is NOT in addon.py")
             else:
                 rec("set_texture",
-                    h.classify(ok_st, assigned and has_sep, sep_out is not None),
-                    f"assigned={assigned}, ARM-split node present={has_sep}, sepRGB_err={sepRGB_err}")
+                    h.classify(ok_st or (assigned and has_sep), assigned and has_sep,
+                               sep_out is not None),
+                    f"assigned={assigned}, ARM-split node present={has_sep}, sepRGB_err={sepRGB_err}"
+                    + ("" if ok_st else "; response lost (mutating — not retried; state delta decides)"))
 
     # 8) the remaining status calls — toggle/consistency (no writes).
     for tool, toggle in (("get_hyper3d_status", "blendermcp_use_hyper3d"),
