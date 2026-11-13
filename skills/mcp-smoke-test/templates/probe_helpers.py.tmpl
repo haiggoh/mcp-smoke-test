@@ -54,12 +54,14 @@ def classify(ok, changed, verify_available):
 
 
 def owned_new(existed_before, exists_after):
-    """True only when the probe CREATED the artifact: absent before, present after.
+    """True only when the probe CREATED the artifact: provably absent before, present after.
 
-    Cleanup must delete only what the probe itself created — a name that already
-    existed before the call is the user's, whatever the call returned.
+    existed_before=None means the before-read itself failed (UNKNOWN, not absent) — never
+    claim on unknown, or cleanup could delete a pre-existing user artifact through a
+    transient read failure. A name that already existed is the user's, whatever the call
+    returned.
     """
-    return (not existed_before) and bool(exists_after)
+    return existed_before is False and bool(exists_after)
 
 
 def parse_blender_versions(dir_names):

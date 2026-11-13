@@ -57,9 +57,13 @@ for line in sys.stdin:
 def run_launcher(tmp_path, mode):
     stub = tmp_path / "smoke_stub.py"
     stub.write_text(SMOKE_STUB)
+    # the REAL documented env literal from blender_params — it references HOME, so this
+    # exercises the launcher heredoc's `HOME = os.path.expanduser("~")` line (a PATH-only
+    # env here would let that line rot unnoticed)
+    from blender_params import BLENDER_PARAMS
     params = {
         "MCP_SERVER_ARGV": json.dumps([sys.executable, str(stub), mode]),
-        "MCP_SERVER_ENV": '{"PATH": os.environ["PATH"]}',
+        "MCP_SERVER_ENV": BLENDER_PARAMS["MCP_SERVER_ENV"],
         "APP_CONFIG_DIR": str(tmp_path / "no-such-config"),
         "SMOKE_CALL": "get_scene_info",
         "SMOKE_ARGS": '{"user_prompt": "smoke test"}',

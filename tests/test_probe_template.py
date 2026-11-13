@@ -1,10 +1,15 @@
-import ast, os
-from conftest import TEMPLATES, BLENDER
+import ast
+import os
+
+from conftest import TEMPLATES, require_instance
 from render import render, strip_banner, placeholders
 from blender_params import BLENDER_PARAMS
 
 TMPL = os.path.join(TEMPLATES, "probe-capabilities.py.tmpl")
-PROVEN = os.path.join(BLENDER, "probe-capabilities.py")
+
+
+def _proven_path():
+    return os.path.join(require_instance(), "probe-capabilities.py")
 
 def test_instantiated_is_valid_python():
     out = render(open(TMPL).read(), BLENDER_PARAMS)
@@ -12,7 +17,8 @@ def test_instantiated_is_valid_python():
 
 def test_roundtrip_reproduces_proven_file():
     out = strip_banner(render(open(TMPL).read(), BLENDER_PARAMS))
-    proven = open(PROVEN).read()
+    with open(_proven_path()) as f:
+        proven = f.read()
     assert out == proven, "instantiated template must byte-match the proven Blender probe"
 
 def test_loadbearing_engine_lines_present():

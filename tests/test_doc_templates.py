@@ -1,5 +1,6 @@
 import os
-from conftest import TEMPLATES, BLENDER
+
+from conftest import TEMPLATES, require_instance
 from render import render, strip_banner, placeholders
 from blender_params import BLENDER_PARAMS
 
@@ -10,9 +11,11 @@ PAIRS = [
 ]
 
 def test_doc_roundtrips():
+    inst = require_instance()
     for tmpl, proven in PAIRS:
         out = strip_banner(render(open(os.path.join(TEMPLATES, tmpl)).read(), BLENDER_PARAMS))
-        assert out == open(os.path.join(BLENDER, proven)).read(), f"{tmpl} round-trip mismatch"
+        with open(os.path.join(inst, proven)) as f:
+            assert out == f.read(), f"{tmpl} round-trip mismatch"
 
 def test_no_stray_todo_markers():
     for tmpl, _ in PAIRS:

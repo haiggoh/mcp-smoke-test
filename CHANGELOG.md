@@ -26,10 +26,21 @@
   `MCP_SERVER_ENV` dict (it previously hardcoded a PATH-only env).
 - **The suite is self-contained**: the round-trip checks skip with a reason when the proven
   Blender instance is absent (`MCP_SMOKE_INSTANCE_DIR` overrides; an explicit override that does
-  not exist fails loudly), and the probe engine and launcher are additionally exercised offline
-  against stub stdio MCP servers (10 new tests, watched red against the unfixed code first).
+  not exist fails loudly at the lockstep tests, not at collection), and the probe engine and
+  launcher are additionally exercised offline against stub stdio MCP servers (new tests watched
+  red against the unfixed code first; every new guard mutation-checked red, then restored).
+- **Cross-family review round (Mistral Large 4) fixes:** a NOT-DECLARED call now records the
+  `NOT-DECLARED` status in capability-report.json instead of a BROKEN capability verdict
+  (`verdict()` at every call site); existence reads are tri-state (`None` = read failed) and
+  `owned_new` never claims on an unknown before-state (a transient read failure could otherwise
+  delete a pre-existing user artifact); probe artifact names are unique per run (a pre-existing
+  ASSERT_* name can no longer produce an auto-renamed `.001` twin that leaks past cleanup);
+  image cleanup is an exact-name diff, not a prefix purge (which could delete a pre-existing
+  orphaned user image); the tools/list gate retries its fetch once instead of permanently
+  disabling itself after a single slow fetch; the smoke tests exercise the real documented
+  `MCP_SERVER_ENV` literal (the launcher heredoc's `HOME` line is load-bearing and pinned).
 - The proven Blender instance files were updated in lockstep (template↔instance round-trip
-  holds): instance helper tests 15/15, repo suite 32/32.
+  holds): instance helper tests 16/16, repo suite 41/41.
 
 ## [0.2.2] — 2026-10-31
 

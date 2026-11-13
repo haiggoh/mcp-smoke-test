@@ -74,7 +74,13 @@ for line in sys.stdin:
             json.dump(counts, f)
         if mode == "retry_then_ok" and counts.get(name, 0) == 1:
             continue  # first attempt: silence (transport hiccup)
-        if name == "mutating_tool":
+        if mode == "code_fails" and name == "execute_blender_code":
+            sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": mid, "result": {
+                "isError": True,
+                "content": [{"type": "text", "text": "simulation failed"}]}}) + "\n")
+            sys.stdout.flush()
+            continue
+        if name == "mutating_tool" and mode != "respond_mutating":
             continue  # never respond
         sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": mid,
             "result": {"content": [{"type": "text",
@@ -213,6 +219,21 @@ def test_owned_new_ownership_rule(helpers):
     assert helpers.owned_new(existed_before=True, exists_after=False) is False
 
 
+def test_owned_new_never_claims_when_before_read_failed(helpers):
+    # a failed existence read is UNKNOWN, not ABSENT: claiming on unknown can delete a
+    # pre-existing user artifact (the dark_wood case through a transient-read window)
+    assert helpers.owned_new(existed_before=None, exists_after=True) is False
+    assert helpers.owned_new(existed_before=None, exists_after=False) is False
+    assert helpers.owned_new(existed_before=None, exists_after=None) is False
+
+
+def test_existence_reads_are_tristate(probe_factory):
+    # a failed read must come back as UNKNOWN (None), not as absent (False) — the two are
+    # indistinguishable in a two-state read and the ownership decision inherits the lie
+    mod, _ = probe_factory("code_fails")
+    assert mod.obj_exists("whatever") is None
+
+
 # --- engine behavior against the stub server -----------------------------------
 
 def test_mutating_call_is_not_retried(probe_factory):
@@ -239,3 +260,61 @@ def test_undeclared_tool_is_never_called(probe_factory):
     assert "NOT-DECLARED" in (raw or "")
     counts = json.load(open(count_file)) if count_file.exists() else {}
     assert "read_tool" not in counts, "a tool absent from tools/list must never be called"
+
+
+def test_verdict_records_not_declared_status_not_broken(probe_factory):
+    # a NOT-DECLARED call was never made — recording BROKEN would be a capability verdict
+    # for something that never ran; the report must carry the NOT-DECLARED status
+    mod, _ = probe_factory("notdeclared")
+    mod.results.clear()
+    mod.verdict("read_tool", False, False, True, "detail",
+                "NOT-DECLARED: 'read_tool' not in server tools/list")
+    assert mod.results[-1]["status"] == "NOT-DECLARED", mod.results[-1]
+    mod.results.clear()
+    mod.verdict("read_tool", False, False, True, "detail", "some error")
+    assert mod.results[-1]["status"] == "BROKEN"
+
+
+def test_mutating_call_with_response_succeeds(probe_factory):
+    # planted positive for the no-retry path: a mutating call that DOES respond returns ok
+    # (an always-NO-RESPONSE implementation would otherwise still pass the counts test)
+    mod, count_file = probe_factory("respond_mutating")
+    ok, _, _ = mod.call("mutating_tool", {}, timeout=2, mutating=True)
+    assert ok is True
+    counts = json.load(open(count_file))
+    assert counts.get("mutating_tool") == 1
+
+
+def test_call_full_not_declared_returns_error_message(probe_factory):
+    mod, _ = probe_factory("notdeclared")
+    m = mod.call_full("read_tool", {}, timeout=2)
+    assert isinstance(m, dict) and "error" in m
+    assert "NOT-DECLARED" in m["error"]["message"]
+
+
+def test_new_image_names_exact_diff_not_prefix(probe_factory):
+    # the old prefix purge deleted a pre-existing orphaned user image whose name merely
+    # started with a created material's name — ownership is an exact diff
+    mod, _ = probe_factory("declared")
+    mod._image_names = lambda: ["dark_wood.png", "dark_wood_old.png", "other.png"]
+    assert mod._new_image_names(["dark_wood_old.png", "other.png"]) == ["dark_wood.png"]
+
+
+def test_new_image_names_claims_nothing_on_failed_before_read(probe_factory):
+    mod, _ = probe_factory("declared")
+    mod._image_names = lambda: ["x.png"]
+    assert mod._new_image_names(None) == []
+
+
+def test_instance_dir_override_missing_fails_loudly(tmp_path, monkeypatch):
+    from conftest import instance_dir
+    monkeypatch.setenv("MCP_SMOKE_INSTANCE_DIR", str(tmp_path / "nope"))
+    with pytest.raises(RuntimeError):
+        instance_dir()
+
+
+def test_instance_dir_unset_and_absent_returns_none(tmp_path, monkeypatch):
+    from conftest import instance_dir
+    monkeypatch.delenv("MCP_SMOKE_INSTANCE_DIR", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))  # default path does not exist under this HOME
+    assert instance_dir() is None

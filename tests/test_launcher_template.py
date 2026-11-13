@@ -1,14 +1,22 @@
-import os, subprocess, tempfile
-from conftest import TEMPLATES, BLENDER
+import os
+import subprocess
+import tempfile
+
+from conftest import TEMPLATES, require_instance
 from render import render, strip_banner, placeholders
 from blender_params import BLENDER_PARAMS
 
 TMPL = os.path.join(TEMPLATES, "test-APP.sh.tmpl")
-PROVEN = os.path.join(BLENDER, "test-blender.sh")
+
+
+def _proven_path():
+    return os.path.join(require_instance(), "test-blender.sh")
+
 
 def test_roundtrip_reproduces_proven_launcher():
     out = strip_banner(render(open(TMPL).read(), BLENDER_PARAMS))
-    assert out == open(PROVEN).read()
+    with open(_proven_path()) as f:
+        assert out == f.read()
 
 def test_instantiated_passes_bash_syntax_check():
     out = render(open(TMPL).read(), BLENDER_PARAMS)
