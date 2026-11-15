@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.4] — 2026-11-15
+
+### Added — Phase 3 Wave A: committed portable package (COORDINATION C1/C2)
+
+- New `scripts/build-portable.py` (from the reviewed pilot pattern) generates the committed
+  `portable/` package: same-name manifest + the WHOLE skill tree (SKILL.md, `templates/`,
+  `examples/`) — the templates are the instantiation payload and live under the skill dir,
+  so `${CLAUDE_SKILL_DIR}`-relative references resolve inside the package on every surface.
+  Emits `portable/PORTABLE-BUILD.json` (haiggoh-portable-build/1) and a deterministic
+  `dist/mcp-smoke-test-portable.zip`.
+- `tests/test_portable.py` pins freshness, same-name manifest, no `bin/`, the
+  host→portable skill-tree set (byte-identical), closure completeness (skill-relative
+  `../` links must RESOLVE inside portable/), the C2 schema, deterministic
+  side-effect-free zip, and strict-YAML over `skills/` AND `portable/skills/`.
+
 ## [0.2.3] — 2026-11-13
 
 ### Fixed (desktop-migration FLEET Phase 1 P0)

@@ -52,7 +52,7 @@
     }
   ],
   "files": {
-    ".claude-plugin/plugin.json": "0b6b08edd141dd0185351ce19c5bfa0ce2748b7993ddef2b5c9cfb8e82b84629",
+    ".claude-plugin/plugin.json": "7d6ec6c9437300e751d0f972eb52f52136ad5a41bafaf721582957d8ffe44674",
     "skills/mcp-smoke-test/SKILL.md": "531d99092687b1be0eaa456b15cbcacea5056c0de6af04d626ecaa684f90d03c",
     "skills/mcp-smoke-test/examples/blender.md": "2e4fcbcd0885d43b8a59a2b8c09084dfb3c623b98f259686036d00c36832c10c",
     "skills/mcp-smoke-test/examples/photoshop.md": "2887320e4d8d6212988de9a3ec9e776ae6a8c34a7e2495b2ad2c6481d003cdee",
@@ -65,7 +65,7 @@
     "skills/mcp-smoke-test/templates/test-APP.sh.tmpl": "e97c5ae74231e483ee84f896627a8655911eaf1425905b3e4e62314c55b6a443"
   },
   "schema": "haiggoh-portable-build/1",
-  "source_commit": "13c026ad01d4ce8ecd0cf40e405709c6878854d1",
+  "source_commit": "ed1f0f794a53e5b80804e9d1b513ab99102813f9",
   "source_repo": "haiggoh/mcp-smoke-test",
   "transform_version": "1"
 }
