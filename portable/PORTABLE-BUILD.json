@@ -1,0 +1,71 @@
+{
+  "builder": "scripts/build-portable.py",
+  "builder_version": "1.0.0",
+  "components": [
+    {
+      "adaptation_class": "mechanical",
+      "evidence_level": "source-inspected",
+      "kind": "manifest",
+      "notes": "same name+version as the host manifest; an installed marketplace plugin wins over a synced copy in Code, so no double-run",
+      "path": ".claude-plugin/plugin.json",
+      "surfaces": {
+        "chat": true,
+        "code": true,
+        "cowork": true
+      }
+    },
+    {
+      "adaptation_class": "native-unchanged",
+      "evidence_level": "source-inspected",
+      "kind": "skill",
+      "notes": "pure method guidance; strict-YAML frontmatter pinned by tests",
+      "path": "skills/mcp-smoke-test/SKILL.md",
+      "surfaces": {
+        "chat": true,
+        "code": true,
+        "cowork": true
+      }
+    },
+    {
+      "adaptation_class": "native-unchanged",
+      "evidence_level": "source-inspected",
+      "kind": "skill-resources",
+      "notes": "the instantiation payload (probe engine, launcher, helpers, docs skeletons); skill-relative, no ${CLAUDE_PLUGIN_ROOT} needed \u2014 ${CLAUDE_SKILL_DIR}/templates/ resolves on every surface (build.md fact 6)",
+      "path": "skills/mcp-smoke-test/templates/",
+      "surfaces": {
+        "chat": true,
+        "code": true,
+        "cowork": true
+      }
+    },
+    {
+      "adaptation_class": "native-unchanged",
+      "evidence_level": "source-inspected",
+      "kind": "skill-resources",
+      "notes": "worked Blender/Photoshop instances referenced by the skill text",
+      "path": "skills/mcp-smoke-test/examples/",
+      "surfaces": {
+        "chat": true,
+        "code": true,
+        "cowork": true
+      }
+    }
+  ],
+  "files": {
+    ".claude-plugin/plugin.json": "0b6b08edd141dd0185351ce19c5bfa0ce2748b7993ddef2b5c9cfb8e82b84629",
+    "skills/mcp-smoke-test/SKILL.md": "531d99092687b1be0eaa456b15cbcacea5056c0de6af04d626ecaa684f90d03c",
+    "skills/mcp-smoke-test/examples/blender.md": "2e4fcbcd0885d43b8a59a2b8c09084dfb3c623b98f259686036d00c36832c10c",
+    "skills/mcp-smoke-test/examples/photoshop.md": "2887320e4d8d6212988de9a3ec9e776ae6a8c34a7e2495b2ad2c6481d003cdee",
+    "skills/mcp-smoke-test/templates/APP-MCP-CAPABILITIES.md.tmpl": "9e0f340c970c54a940bb7823168268ab9aaf608f768fd0b6b670f74ca159e22c",
+    "skills/mcp-smoke-test/templates/PROJECT-NOTES.md.tmpl": "7963ac80e4d76b0548398c919fa071eb6c1574e3ccc45b7df020b093e256a76b",
+    "skills/mcp-smoke-test/templates/interactive-guide.md.tmpl": "348fb65fd1079d429ca54b8331325c2d6c8854a29e7632116d8bb9fa4e2729a6",
+    "skills/mcp-smoke-test/templates/placeholder-manifest.md": "b02f7c05dc60ed1100ae426a96d3ba31e3740969a907fd47787d93773c898b5f",
+    "skills/mcp-smoke-test/templates/probe-capabilities.py.tmpl": "e5c0e8d8bca08ca80f9ba38a7e38175937c860fb6537b8481ada4bd9181c1e33",
+    "skills/mcp-smoke-test/templates/probe_helpers.py.tmpl": "662eeb775aaa6bdc9efb6169bf49a60b802cd9be6f5b7145b05a30f3c1d83534",
+    "skills/mcp-smoke-test/templates/test-APP.sh.tmpl": "e97c5ae74231e483ee84f896627a8655911eaf1425905b3e4e62314c55b6a443"
+  },
+  "schema": "haiggoh-portable-build/1",
+  "source_commit": "13c026ad01d4ce8ecd0cf40e405709c6878854d1",
+  "source_repo": "haiggoh/mcp-smoke-test",
+  "transform_version": "1"
+}
